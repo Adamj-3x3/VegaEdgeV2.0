@@ -17,12 +17,12 @@ export default async function handler(
     }
 
     // Call Python script directly
-    const { spawn } = require('child_process');
-    const path = require('path');
+    const { spawn } = await import('child_process');
+    const path = await import('path');
     
     return new Promise((resolve) => {
       const pythonProcess = spawn('python3', [
-        path.join(process.cwd(), 'run_analysis.py'),
+        path.default.join(process.cwd(), 'run_analysis.py'),
         'bullish',
         ticker,
         min_dte.toString(),
