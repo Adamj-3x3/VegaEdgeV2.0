@@ -38,12 +38,12 @@ def bs_delta(S, K, T, r, sigma, option_type='call', q=0.0):
     return np.exp(-q * T) * norm.cdf(D1) if option_type == 'call' else np.exp(-q * T) * (norm.cdf(D1) - 1)
 
 
-def bs_vanna(S, K, T, r, sigma, q=0.0):
-    """Calculate Vanna (∂²P/∂S∂σ) for an option using Black-Scholes formula."""
+def bs_volga(S, K, T, r, sigma, q=0.0):
+    """Calculate Volga (∂²P/∂σ²) for an option using Black-Scholes formula."""
     if T <= 0 or sigma <= 0: return 0
     D1 = d1(S, K, T, r, sigma, q)
     D2 = d2(S, K, T, r, sigma, q)
-    return -np.exp(-q * T) * norm.pdf(D1) * D2 / sigma
+    return S * np.exp(-q * T) * norm.pdf(D1) * np.sqrt(T) * (D1 * D2) / sigma
 
 
 def get_options_data(ticker, expiration, underlying_price):
@@ -93,8 +93,8 @@ def analyze_bullish_risk_reversal(calls, puts, underlying_price, expiration_date
         df['delta'] = df.apply(
             lambda row: bs_delta(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
                                  option_type, dividend_yield), axis=1)
-        df['vanna'] = df.apply(
-            lambda row: bs_vanna(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
+        df['volga'] = df.apply(
+            lambda row: bs_volga(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
                                  dividend_yield), axis=1)
 
     otm_calls = calls[calls['strike'] > underlying_price].copy()
@@ -134,8 +134,8 @@ def analyze_bearish_risk_reversal(calls, puts, underlying_price, expiration_date
         df['delta'] = df.apply(
             lambda row: bs_delta(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
                                  option_type, dividend_yield), axis=1)
-        df['vanna'] = df.apply(
-            lambda row: bs_vanna(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
+        df['volga'] = df.apply(
+            lambda row: bs_volga(underlying_price, row['strike'], T, risk_free_rate, row['impliedVolatility'],
                                  dividend_yield), axis=1)
 
     otm_calls = calls[calls['strike'] > underlying_price].copy()
@@ -180,7 +180,7 @@ def create_bullish_strategy_combination(call_row, put_row):
             'long_call_strike': call_row['strike'], 'short_put_strike': put_row['strike'],
             'net_cost': net_cost, 'iv_advantage': put_row['impliedVolatility'] - call_row['impliedVolatility'],
             'net_delta': call_row['delta'] - put_row['delta'], 'net_vega': call_row['vega'] - put_row['vega'],
-            'net_vanna': call_row['vanna'] - put_row['vanna'],
+            'net_volga': call_row['volga'] - put_row['volga'],
             'max_loss_down': put_row['strike'] - (put_row['bid'] - call_row['ask']),
             'breakeven': call_row['strike'] + net_cost,
             'efficiency': efficiency,
@@ -210,7 +210,7 @@ def create_bearish_strategy_combination(put_row, call_row):
             'long_put_strike': put_row['strike'], 'short_call_strike': call_row['strike'],
             'net_cost': net_cost, 'iv_advantage': call_row['impliedVolatility'] - put_row['impliedVolatility'],
             'net_delta': put_row['delta'] - call_row['delta'], 'net_vega': put_row['vega'] - call_row['vega'],
-            'net_vanna': put_row['vanna'] - call_row['vanna'],
+            'net_volga': put_row['volga'] - call_row['volga'],
             'max_loss_up': call_row['strike'] + (call_row['bid'] - put_row['ask']),
             'breakeven': put_row['strike'] - net_cost,
             'efficiency': efficiency,
@@ -224,8 +224,8 @@ def is_valid_bullish_combo(combo):
     if not combo: return False
     if abs(combo['net_cost']) > 20: return False
     if combo['net_delta'] <= 0.1 or combo['net_vega'] <= 0: return False
-    # Add Vanna constraint - we want net Vanna to be close to zero (within reasonable bounds)
-    if abs(combo['net_vanna']) > 0.1: return False
+    # Add Volga constraint - we want net Volga to be close to zero (within reasonable bounds)
+    if abs(combo['net_volga']) > 0.1: return False
     return True
 
 
@@ -233,8 +233,8 @@ def is_valid_bearish_combo(combo):
     if not combo: return False
     if abs(combo['net_cost']) > 20: return False
     if combo['net_delta'] >= -0.1 or combo['net_vega'] > 0.01: return False
-    # Add Vanna constraint - we want net Vanna to be close to zero (within reasonable bounds)
-    if abs(combo['net_vanna']) > 0.1: return False
+    # Add Volga constraint - we want net Volga to be close to zero (within reasonable bounds)
+    if abs(combo['net_volga']) > 0.1: return False
     return True
 
 
@@ -249,9 +249,9 @@ def rank_combinations(combinations):
 
     df['delta_score'] = safe_normalize(df['net_delta'])
     df['vega_score'] = safe_normalize(df['net_vega'].abs(), reverse=True)  # Lower absolute vega is better
-    df['vanna_score'] = safe_normalize(df['net_vanna'].abs(), reverse=True)  # Lower absolute vanna is better
+    df['volga_score'] = safe_normalize(df['net_volga'].abs(), reverse=True)  # Lower absolute volga is better
     df['efficiency_score'] = safe_normalize(df['efficiency'])
-    df['total_score'] = (df['delta_score'] * 0.30 + df['efficiency_score'] * 0.30 + df['vega_score'] * 0.20 + df['vanna_score'] * 0.20)
+    df['total_score'] = (df['delta_score'] * 0.30 + df['efficiency_score'] * 0.30 + df['vega_score'] * 0.20 + df['volga_score'] * 0.20)
     return df.sort_values('total_score', ascending=False)
 
 
@@ -264,12 +264,12 @@ def rank_bearish_combinations(combinations):
         norm = (series - series.min()) / (series.max() - series.min())
         return 1 - norm if reverse else norm
 
-    # For bearish, we want negative delta (more negative is better), low absolute vega, low absolute vanna, and good efficiency
+    # For bearish, we want negative delta (more negative is better), low absolute vega, low absolute volga, and good efficiency
     df['delta_score'] = safe_normalize(df['net_delta'], reverse=True)  # More negative delta is better
     df['vega_score'] = safe_normalize(df['net_vega'].abs(), reverse=True)  # Lower absolute vega is better
-    df['vanna_score'] = safe_normalize(df['net_vanna'].abs(), reverse=True)  # Lower absolute vanna is better
+    df['volga_score'] = safe_normalize(df['net_volga'].abs(), reverse=True)  # Lower absolute volga is better
     df['efficiency_score'] = safe_normalize(df['efficiency'])
-    df['total_score'] = (df['delta_score'] * 0.30 + df['efficiency_score'] * 0.30 + df['vega_score'] * 0.20 + df['vanna_score'] * 0.20)
+    df['total_score'] = (df['delta_score'] * 0.30 + df['efficiency_score'] * 0.30 + df['vega_score'] * 0.20 + df['volga_score'] * 0.20)
     return df.sort_values('total_score', ascending=False)
 
 

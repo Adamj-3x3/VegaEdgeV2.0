@@ -233,7 +233,7 @@ export default function Home() {
                           <th className="px-4 py-3 text-left text-blue-300 font-medium">Strikes</th>
                           <th className="px-4 py-3 text-left text-blue-300 font-medium">Net Cost</th>
                           <th className="px-4 py-3 text-left text-blue-300 font-medium">Net Vega</th>
-                          <th className="px-4 py-3 text-left text-blue-300 font-medium">Net Vanna</th>
+                          <th className="px-4 py-3 text-left text-blue-300 font-medium">Net Volga</th>
                           <th className="px-4 py-3 text-left text-blue-300 font-medium">Efficiency</th>
                           <th className="px-4 py-3 text-left text-blue-300 font-medium">Score</th>
                         </tr>

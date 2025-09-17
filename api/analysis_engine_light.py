@@ -34,12 +34,12 @@ def bs_delta(S, K, T, r, sigma, option_type='call', q=0.0):
     return math.exp(-q * T) * normal_cdf(D1) if option_type == 'call' else math.exp(-q * T) * (normal_cdf(D1) - 1)
 
 
-def bs_vanna(S, K, T, r, sigma, q=0.0):
-    """Calculate Vanna (∂²P/∂S∂σ) for an option using Black-Scholes formula."""
+def bs_volga(S, K, T, r, sigma, q=0.0):
+    """Calculate Volga (∂²P/∂σ²) for an option using Black-Scholes formula."""
     if T <= 0 or sigma <= 0: return 0
     D1 = d1(S, K, T, r, sigma, q)
     D2 = d2(S, K, T, r, sigma, q)
-    return -math.exp(-q * T) * normal_pdf(D1) * D2 / sigma
+    return S * math.exp(-q * T) * normal_pdf(D1) * math.sqrt(T) * (D1 * D2) / sigma
 
 def get_options_data(ticker, expiration, underlying_price):
     try:
@@ -104,12 +104,12 @@ def analyze_bullish_risk_reversal(calls, puts, underlying_price, expiration_date
     for call in calls:
         call['vega'] = bs_vega(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
         call['delta'] = bs_delta(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'], 'call')
-        call['vanna'] = bs_vanna(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
+        call['volga'] = bs_volga(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
     
     for put in puts:
         put['vega'] = bs_vega(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
         put['delta'] = bs_delta(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'], 'put')
-        put['vanna'] = bs_vanna(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
+        put['volga'] = bs_volga(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
 
     # Filter OTM options
     otm_calls = [c for c in calls if c['strike'] > underlying_price]
@@ -137,9 +137,9 @@ def analyze_bullish_risk_reversal(calls, puts, underlying_price, expiration_date
             
             net_delta = call['delta'] - put['delta']
             net_vega = call['vega'] - put['vega']
-            net_vanna = call['vanna'] - put['vanna']
+            net_volga = call['volga'] - put['volga']
             
-            if net_delta <= 0.1 or net_vega <= 0 or abs(net_vanna) > 0.1:
+            if net_delta <= 0.1 or net_vega <= 0 or abs(net_volga) > 0.1:
                 continue
             
             combinations.append({
@@ -148,7 +148,7 @@ def analyze_bullish_risk_reversal(calls, puts, underlying_price, expiration_date
                 'net_cost': net_cost,
                 'net_delta': net_delta,
                 'net_vega': net_vega,
-                'net_vanna': net_vanna,
+                'net_volga': net_volga,
                 'efficiency': efficiency,
                 'breakeven': call['strike'] + net_cost,
                 'expiration': expiration_date,
@@ -167,12 +167,12 @@ def analyze_bearish_risk_reversal(calls, puts, underlying_price, expiration_date
     for call in calls:
         call['vega'] = bs_vega(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
         call['delta'] = bs_delta(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'], 'call')
-        call['vanna'] = bs_vanna(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
+        call['volga'] = bs_volga(underlying_price, call['strike'], T, risk_free_rate, call['impliedVolatility'])
     
     for put in puts:
         put['vega'] = bs_vega(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
         put['delta'] = bs_delta(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'], 'put')
-        put['vanna'] = bs_vanna(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
+        put['volga'] = bs_volga(underlying_price, put['strike'], T, risk_free_rate, put['impliedVolatility'])
 
     # Filter OTM options
     otm_calls = [c for c in calls if c['strike'] > underlying_price]
@@ -200,9 +200,9 @@ def analyze_bearish_risk_reversal(calls, puts, underlying_price, expiration_date
             
             net_delta = put['delta'] - call['delta']
             net_vega = put['vega'] - call['vega']
-            net_vanna = put['vanna'] - call['vanna']
+            net_volga = put['volga'] - call['volga']
             
-            if net_delta >= -0.1 or net_vega > 0.01 or abs(net_vanna) > 0.1:
+            if net_delta >= -0.1 or net_vega > 0.01 or abs(net_volga) > 0.1:
                 continue
             
             combinations.append({
@@ -211,7 +211,7 @@ def analyze_bearish_risk_reversal(calls, puts, underlying_price, expiration_date
                 'net_cost': net_cost,
                 'net_delta': net_delta,
                 'net_vega': net_vega,
-                'net_vanna': net_vanna,
+                'net_volga': net_volga,
                 'efficiency': efficiency,
                 'breakeven': put['strike'] - net_cost,
                 'expiration': expiration_date,
@@ -224,11 +224,11 @@ def rank_combinations(combinations):
     if not combinations:
         return []
     
-    # Ranking based on efficiency, delta, and low vega/vanna exposure
+    # Ranking based on efficiency, delta, and low vega/volga exposure
     def score(combo):
         vega_penalty = abs(combo['net_vega']) * 0.1  # Penalize high vega exposure
-        vanna_penalty = abs(combo['net_vanna']) * 0.1  # Penalize high vanna exposure
-        return combo['efficiency'] * 0.4 + (combo['net_delta'] / 10) * 0.3 - vega_penalty - vanna_penalty
+        volga_penalty = abs(combo['net_volga']) * 0.1  # Penalize high volga exposure
+        return combo['efficiency'] * 0.4 + (combo['net_delta'] / 10) * 0.3 - vega_penalty - volga_penalty
     
     return sorted(combinations, key=score, reverse=True)
 

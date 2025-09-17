@@ -76,7 +76,7 @@ def parse_analysis_result(result_text):
                     continue
                 parts = [part.strip() for part in line.split("|") if part.strip()]
                 if len(parts) >= 8:
-                    top_5_data.append(tuple(parts[:8]))  # Rank, Expiration, Strikes, Net Cost, Net Vega, Net Vanna, Efficiency, Score
+                    top_5_data.append(tuple(parts[:8]))  # Rank, Expiration, Strikes, Net Cost, Net Vega, Net Volga, Efficiency, Score
     
     return {
         "summary": "\n".join(summary_lines),
