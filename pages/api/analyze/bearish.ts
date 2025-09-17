@@ -32,15 +32,15 @@ export default async function handler(
       let result = '';
       let error = '';
       
-      pythonProcess.stdout.on('data', (data) => {
+      pythonProcess.stdout.on('data', (data: Buffer) => {
         result += data.toString();
       });
       
-      pythonProcess.stderr.on('data', (data) => {
+      pythonProcess.stderr.on('data', (data: Buffer) => {
         error += data.toString();
       });
       
-      pythonProcess.on('close', (code) => {
+      pythonProcess.on('close', (code: number | null) => {
         if (code !== 0) {
           console.error('Python script error:', error);
           return res.status(500).json({ 
