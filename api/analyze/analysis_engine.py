@@ -303,8 +303,8 @@ Bid-Ask Spreads: Call=${pc['call_spread']:.2f}, Put=${pc['put_spread']:.2f}, Tot
     
     # Create top recommendations table
     table_lines = []
-    table_lines.append("RANK | EXPIRATION | STRIKES | NET COST | NET VEGA | EFFICIENCY | SCORE")
-    table_lines.append("-" * 80)
+    table_lines.append("RANK | EXPIRATION | STRIKES | NET COST | NET VEGA | NET VANNA | EFFICIENCY | SCORE")
+    table_lines.append("-" * 90)
     
     for i, row in results.head(5).iterrows():
         if strategy_type == "Bullish":
@@ -313,7 +313,7 @@ Bid-Ask Spreads: Call=${pc['call_spread']:.2f}, Put=${pc['put_spread']:.2f}, Tot
             strikes = f"${row['long_put_strike']:.2f}/{row['short_call_strike']:.2f}"
         
         cost_txt = f"${abs(row['net_cost']):.2f} {'CR' if row['net_cost'] < 0 else 'DB'}"
-        table_lines.append(f"{i+1:4} | {row['expiration']:10} | {strikes:15} | {cost_txt:9} | {row['net_vega']:8.3f} | {row['efficiency']:9.1%} | {row['total_score']:.3f}")
+        table_lines.append(f"{i+1:4} | {row['expiration']:10} | {strikes:15} | {cost_txt:9} | {row['net_vega']:8.3f} | {row['net_vanna']:9.3f} | {row['efficiency']:9.1%} | {row['total_score']:.3f}")
     
     # Create risk warning
     if strategy_type == "Bullish":
@@ -346,6 +346,7 @@ Expiration: {best['expiration']} ({best['days_to_exp']} days)
 Net Cost: {cost_display}
 Breakeven: ${best['breakeven']:.2f}
 Net Vega: {best['net_vega']:.3f}
+Net Vanna: {best['net_vanna']:.3f}
 Efficiency: {best['efficiency']:.1%}
 """
     else:
@@ -353,6 +354,7 @@ Efficiency: {best['efficiency']:.1%}
 Net Cost: {cost_display}
 Breakeven: ${best['breakeven']:.2f}
 Net Vega: {best['net_vega']:.3f}
+Net Vanna: {best['net_vanna']:.3f}
 Efficiency: {best['efficiency']:.1%}
 """
     
